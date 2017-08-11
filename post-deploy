@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+PLUGIN_BASE_PATH="$PLUGIN_PATH"
+if [[ -n $DOKKU_API_VERSION ]]; then
+  PLUGIN_BASE_PATH="$PLUGIN_ENABLED_PATH"
+fi
+
+source "$PLUGIN_BASE_PATH/common/functions"
+set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+set +e
+
+APP="$1"
+APP_ROOT="$DOKKU_ROOT/$APP"
+
+# global config
+SENTRY_URL=$(dokku config:get "$APP" SENTRY_URL || dokku config:get --global SENTRY_URL)
+SENTRY_ORG=$(dokku config:get "$APP" SENTRY_ORG || dokku config:get --global SENTRY_ORG)
+SENTRY_AUTH_TOKEN=$(dokku config:get "$APP" SENTRY_AUTH_TOKEN || dokku config:get --global SENTRY_ORG)
+# app config
+SENTRY_REPO=$(dokku config:get "$APP" SENTRY_REPO)
+SENTRY_PROJECT=$(dokku config:get "$APP" SENTRY_PROJECT)
+
+
+if [[ -z $SENTRY_URL || -z $SENTRY_ORG || -z $SENTRY_AUTH_TOKEN || -z $SENTRY_REPO || -z $SENTRY_PROJECT ]]; then
+  cd "$APP_ROOT"
+  # RAILS_ENV=$(dokku config:get "$APP" RACK_ENV || dokku config:get "$APP" RAILS_ENV || echo 'production')
+  
+  GIT_REV=$(cat "$APP_ROOT/.dokku-git-rev" 2> /dev/null || printf '0%.0s' {1..41})
+  GIT_MESSAGE=$(git log "$GIT_REV" -n1 --pretty='format:%s' 2> /dev/null || echo '')
+  dokku_log_info1 "Notifying airbrake..."
+  curl "$BASE_URL/deploys.txt" --silent \
+    --data "api_key=$API_KEY" \
+    --data "deploy[local_username]=Dokku" \
+    --data "deploy[rails_env]=$RAILS_ENV" \
+    --data "deploy[scm_repository]=$REPO_URL" \
+    --data "deploy[scm_revision]=$GIT_REV" \
+    --data "deploy[message]=$GIT_MESSAGE" > /dev/null
+  exit 0
+fi

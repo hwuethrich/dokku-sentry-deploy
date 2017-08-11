@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+
+set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+
+PLUGIN_BASE_PATH="$PLUGIN_PATH"
+if [[ -n $DOKKU_API_VERSION ]]; then
+  PLUGIN_BASE_PATH="$PLUGIN_ENABLED_PATH"
+fi
+source "$PLUGIN_BASE_PATH/common/functions"
+
+case "$1" in
+  sentry-deploy)
+    [[ -z $2 ]] && echo "Please specify an app to run the command on" && exit 1
+    verify_app_name "$2"
+    APP="$2"
+    [[ -z $(dokku config:get "$APP" SENTRY_URL || dokku config:get --global SENTRY_URL) ]] && echo "SENTRY_URL is not defined for $APP (eg. https://sentry.example.com)" && exit 1
+    [[ -z $(dokku config:get "$APP" SENTRY_ORG || dokku config:get --global SENTRY_ORG) ]] && echo "SENTRY_ORG is not defined for $APP (eg. myorg)" && exit 1
+    [[ -z $(dokku config:get "$APP" SENTRY_AUTH_TOKEN || || dokku config:get --global SENTRY_AUTH_TOKEN) ]] && echo "SENTRY_AUTH_TOKEN is not defined for $APP" && exit 1
+    [[ -z $(dokku config:get "$APP" SENTRY_REPO) ]] && echo "SENTRY_REPO is not defined for $APP" && exit 1
+    [[ -z $(dokku config:get "$APP" SENTRY_PROJECT) ]] && echo "SENTRY_PROJECT is not defined for $APP" && exit 1
+    echo "Sentry deploy hook is enabled for $APP"
+    ;;
+
+  help)
+    HELP=$(cat<<EOF
+    sentry-deploy <app>, Display the current sentry deploy hook status of app
+EOF
+)
+    if [[ -n $DOKKU_API_VERSION ]]; then
+      echo "$HELP"
+    else
+      cat && echo "$HELP"
+    fi
+    ;;
+
+  *)
+    exit $DOKKU_NOT_IMPLEMENTED_EXIT
+    ;;
+
+esac
